@@ -49,7 +49,7 @@ async def download_track(c, msg: Message):
             state = await task_manager.create(user, label="Download")
             user['task_id'] = state.task_id
             user['cancel_event'] = state.cancel_event
-            user['bot_msg'] = await send_message(msg, f"Starting download…\nID: `{state.task_id}`\nUse /cancel {state.task_id} to stop.")
+            user['bot_msg'] = await send_message(msg, f"Starting download…\nTask ID:\n```\n{state.task_id}\n```\nUse /cancel {state.task_id} to stop.")
             try:
                 await start_link(link, user, options)
                 await send_message(user, lang.s.TASK_COMPLETED)

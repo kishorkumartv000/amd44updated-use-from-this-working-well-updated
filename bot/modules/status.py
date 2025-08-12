@@ -16,10 +16,14 @@ async def status_cmd(c: Client, msg: Message):
 
     responses = []
     for tid, state in tasks.items():
-        # Prefer rendering via attached progress reporter if available
+        # Prefer super-light snapshot if available to avoid CPU spikes
         try:
             if getattr(state, "progress", None):
-                progress_text = state.progress._render()
+                reporter = state.progress
+                if hasattr(reporter, "snapshot"):
+                    progress_text = f"🆔 {tid} • {reporter.snapshot()}"
+                else:
+                    progress_text = reporter._render()
             else:
                 progress_text = f"🆔 {tid} • {state.label} • {state.status}"
         except Exception:

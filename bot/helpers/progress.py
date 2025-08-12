@@ -152,3 +152,30 @@ class ProgressReporter:
             pass
 
         return "\n".join(lines)
+
+    def snapshot(self) -> str:
+        """Return a very light-weight single-line status string without system stats.
+        Avoids any disk, CPU, or network calls so it can be used for /status cheaply.
+        """
+        segments: list[str] = []
+        # Stage
+        segments.append(f"{self.label} • {self.stage}")
+        # Download
+        if self.download_percent or self.tracks_done:
+            if self.tracks_total:
+                tracks = f"{self.tracks_done}/{self.tracks_total}"
+            else:
+                tracks = f"{self.tracks_done}"
+            segments.append(f"DL {self.download_percent}% ({tracks})")
+        # Zip
+        if self.zip_total:
+            percent_zip = int((self.zip_done / self.zip_total) * 100) if self.zip_total else 0
+            segments.append(f"ZIP {percent_zip}% ({self.zip_done}/{self.zip_total})")
+        # Upload
+        if self.upload_total:
+            percent_up = int((self.upload_current / self.upload_total) * 100) if self.upload_total else 0
+            if self.file_index and self.file_total:
+                segments.append(f"UP {percent_up}% ({self.file_index}/{self.file_total})")
+            else:
+                segments.append(f"UP {percent_up}%")
+        return " • ".join(segments)

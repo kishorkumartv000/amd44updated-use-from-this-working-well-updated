@@ -185,6 +185,16 @@ This build is Apple Music–only. Qobuz, Tidal, and Deezer integrations have bee
     ```
 /cancel_all
     ```
+- /status: Show real-time status for your ongoing tasks (downloading, zipping, uploading, uptime). Designed to be lightweight and non-blocking, so it won’t interrupt active tasks.
+  - Example:
+    ```
+/status
+    ```
+- /history (alias /downloads): Show your personal download history with title, artist, type, quality, and date.
+  - Example:
+    ```
+/history
+    ```
 
 ### What happens on cancel
 - The bot stops the active step (downloading, zipping, uploading)
@@ -263,6 +273,8 @@ settings - Open settings panel
 download - Start a download
 cancel - Cancel a running task by ID
 cancel_all - Cancel all your running tasks
+status - Show status of ongoing tasks
+history - Show your download history
 config - Config help for Apple Music YAML
 config_show - Show config values (or specific keys)
 config_get - Get a single config value

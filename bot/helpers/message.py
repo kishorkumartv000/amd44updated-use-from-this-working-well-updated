@@ -1,6 +1,7 @@
 import os
 import asyncio
 import re
+import time
 
 from pyrogram.types import Message
 from pyrogram.errors import MessageNotModified, FloodWait
@@ -87,12 +88,19 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
     # Initialize msg to prevent UnboundLocalError
     msg = None
 
-    # Progress callback wrapper for uploads
+    # Progress callback wrapper for uploads (throttled)
     def _make_progress_cb(label=None, index=None, total=None):
+        last_emit_ts = 0.0
+        throttle_seconds = 0.75
         def _cb(current, total_bytes):
+            nonlocal last_emit_ts
             if cancel_event and cancel_event.is_set():
                 raise RuntimeError("Cancelled")
             if progress_reporter:
+                now = time.monotonic()
+                if (now - last_emit_ts) < throttle_seconds:
+                    return
+                last_emit_ts = now
                 try:
                     loop = asyncio.get_event_loop()
                     loop.create_task(progress_reporter.update_upload(current, total_bytes, file_index=index, file_total=total, label=label or 'Uploading'))

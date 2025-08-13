@@ -153,7 +153,7 @@ The bot includes a full Rclone integration accessible from Telegram.
 
 ### Where files are stored
 
-- `rclone.conf` path: `./rclone.conf` (bot checks `/workspace/rclone.conf` too)
+- `rclone.conf` path: `/workspace/rclone.conf` preferred; falls back to `./rclone.conf` if present
 - Destination: `RCLONE_DEST` stored in DB (overrides `.env` at runtime)
 
 ### Troubleshooting

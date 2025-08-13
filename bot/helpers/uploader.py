@@ -418,7 +418,8 @@ async def rclone_upload(user, path, base_path):
     index_link = None
 
     if bot_set.link_options in ['RCLONE', 'Both']:
-        cmd = f'rclone link --config ./rclone.conf "{Config.RCLONE_DEST}/{relative_path}"'
+        cfg = '/workspace/rclone.conf' if os.path.exists('/workspace/rclone.conf') else ('./rclone.conf' if os.path.exists('./rclone.conf') else '')
+        cmd = f'rclone link --config {cfg} "{Config.RCLONE_DEST}/{relative_path}"' if cfg else f'rclone link "{Config.RCLONE_DEST}/{relative_path}"'
         task = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,

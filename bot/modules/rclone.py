@@ -55,8 +55,35 @@ async def _run(cmd: str) -> (int, str, str):
     return task.returncode, out.decode().strip(), err.decode().strip()
 
 
+def _get_config_arg() -> str:
+    # Prefer explicit Config if it exists on disk
+    candidates = []
+    try:
+        if getattr(Config, "RCLONE_CONFIG", None) and os.path.exists(Config.RCLONE_CONFIG):
+            candidates.append(Config.RCLONE_CONFIG)
+    except Exception:
+        pass
+    candidates.extend(["/workspace/rclone.conf", "rclone.conf"])
+    for p in candidates:
+        try:
+            if p and os.path.exists(p):
+                return f'--config "{p}"'
+        except Exception:
+            continue
+    return ""
+
+
+def _state_data(state: Dict) -> Dict:
+    if not state:
+        return {}
+    if isinstance(state, dict) and "data" in state and isinstance(state["data"], dict):
+        return state["data"]
+    return state
+
+
 async def _list_remotes() -> List[str]:
-    code, out, err = await _run("rclone listremotes --config /workspace/rclone.conf")
+    cfg = _get_config_arg()
+    code, out, err = await _run(f"rclone listremotes {cfg}")
     if code != 0:
         LOGGER.error(f"rclone listremotes failed: {err}")
         return []
@@ -76,10 +103,11 @@ async def _list_items(remote: str, path: str) -> List[Dict[str, str]]:
     # Normalize base: for root, use just remote (no '/'), otherwise strip leading '/'
     norm_path = (path or "").strip("/")
     base = remote if norm_path == "" else f"{remote}{norm_path}/"
+    cfg = _get_config_arg()
     # Directories
-    code_d, out_d, err_d = await _run(f'rclone lsf --dirs-only --config /workspace/rclone.conf "{base}"')
+    code_d, out_d, err_d = await _run(f'rclone lsf --dirs-only {cfg} "{base}"')
     # Files
-    code_f, out_f, err_f = await _run(f'rclone lsf --files-only --config /workspace/rclone.conf "{base}"')
+    code_f, out_f, err_f = await _run(f'rclone lsf --files-only {cfg} "{base}"')
     items: List[Dict[str, str]] = []
     if code_d == 0 and out_d:
         for line in out_d.splitlines():
@@ -99,6 +127,9 @@ async def _list_items(remote: str, path: str) -> List[Dict[str, str]]:
 
 
 def _build_browser_keyboard(state: Dict) -> InlineKeyboardMarkup:
+    # Accept either full conversation state or the nested data dict
+    if isinstance(state, dict) and "data" in state and isinstance(state["data"], dict):
+        state = state["data"]
     items: List[Dict[str, str]] = state.get("items", [])
     page: int = state.get("page", 0)
     mode: str = state.get("rcl_mode", "browse")
@@ -197,13 +228,14 @@ async def _unmount_path(path: str) -> (bool, str):
 
 async def _enter_browser(c: Client, cb: CallbackQuery, remote: str):
     state = await conversation_state.get(cb.from_user.id) or {}
-    mode = state.get("rcl_mode", "browse")
+    mode = _state_data(state).get("rcl_mode", "browse")
     # Start at root (empty path)
     path = ""
     items = await _list_items(remote, path)
     await conversation_state.update(cb.from_user.id, rcl_mode=mode, remote=remote, path=path, items=items, page=0)
+    new_state = await conversation_state.get(cb.from_user.id)
     header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{path or '/'}")
-    await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
+    await edit_message(cb.message, header, _build_browser_keyboard(new_state))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^rclonePanel$"))
@@ -342,7 +374,8 @@ async def rcl_unmount_pick(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    mounts: List[str] = state.get('mounts', [])
+    data = _state_data(state)
+    mounts: List[str] = data.get('mounts', [])
     idx = int(cb.data.split(":")[1])
     if idx < 0 or idx >= len(mounts):
         await rcl_back(c, cb)
@@ -365,14 +398,15 @@ async def rcl_pick_remote(c: Client, cb: CallbackQuery):
     if not remote.endswith(":"):
         remote = remote + ":"
     state = await conversation_state.get(cb.from_user.id) or {}
-    mode = state.get("rcl_mode", "browse")
+    mode = _state_data(state).get("rcl_mode", "browse")
     if mode == 'mount':
         mount_dir = _get_mount_dir(remote)
         try:
             os.makedirs(mount_dir, exist_ok=True)
         except Exception:
             pass
-        cmd = f'rclone mount --config /workspace/rclone.conf "{remote}" "{mount_dir}" --daemon --vfs-cache-mode writes'
+        cfg = _get_config_arg()
+        cmd = f'rclone mount {cfg} "{remote}" "{mount_dir}" --daemon --vfs-cache-mode writes'
         code, out, err = await _run(cmd)
         if code == 0:
             await send_message(cb.message, lang.s.RCLONE_MOUNT_DONE.format(mount_dir))
@@ -388,10 +422,11 @@ async def rcl_up(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    remote = state.get("remote", "")
-    path = state.get("path", "")
+    data = _state_data(state)
+    remote = data.get("remote", "")
+    path = data.get("path", "")
     if not remote:
-        await _show_remote_picker(cb, mode=state.get("rcl_mode", "browse"))
+        await _show_remote_picker(cb, mode=data.get("rcl_mode", "browse"))
         return
     # Go up
     new_path = "" if not path or path.strip("/") == "" else "/".join(path.strip("/").split("/")[:-1])
@@ -399,8 +434,9 @@ async def rcl_up(c: Client, cb: CallbackQuery):
         new_path = "/" + new_path + "/"
     items = await _list_items(remote, new_path)
     await conversation_state.update(cb.from_user.id, path=new_path, items=items, page=0)
+    new_state = await conversation_state.get(cb.from_user.id)
     header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path or '/'}")
-    await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
+    await edit_message(cb.message, header, _build_browser_keyboard(new_state))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_next$"))
@@ -408,10 +444,13 @@ async def rcl_next(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    page = state.get("page", 0) + 1
+    data = _state_data(state)
+    page = data.get("page", 0) + 1
     await conversation_state.update(cb.from_user.id, page=page)
-    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{state.get('remote','')}{state.get('path','')}")
-    await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
+    new_state = await conversation_state.get(cb.from_user.id)
+    d = _state_data(new_state)
+    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{d.get('remote','')}{d.get('path','')}")
+    await edit_message(cb.message, header, _build_browser_keyboard(new_state))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_prev$"))
@@ -419,10 +458,13 @@ async def rcl_prev(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    page = max(0, state.get("page", 0) - 1)
+    data = _state_data(state)
+    page = max(0, data.get("page", 0) - 1)
     await conversation_state.update(cb.from_user.id, page=page)
-    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{state.get('remote','')}{state.get('path','')}")
-    await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
+    new_state = await conversation_state.get(cb.from_user.id)
+    d = _state_data(new_state)
+    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{d.get('remote','')}{d.get('path','')}")
+    await edit_message(cb.message, header, _build_browser_keyboard(new_state))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_open:(\d+)$"))
@@ -430,21 +472,23 @@ async def rcl_open_dir(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
+    data = _state_data(state)
     idx = int(cb.data.split(":")[1])
-    items = state.get("items", [])
+    items = data.get("items", [])
     if idx < 0 or idx >= len(items):
         return
     it = items[idx]
     if it.get("type") != "dir":
         return
-    remote = state.get("remote", "")
-    path = state.get("path", "")
+    remote = data.get("remote", "")
+    path = data.get("path", "")
     base_path = path or "/"
     new_path = f"{base_path}{it['name']}/" if base_path else f"/{it['name']}/"
     new_items = await _list_items(remote, new_path)
     await conversation_state.update(cb.from_user.id, path=new_path, items=new_items, page=0)
+    new_state = await conversation_state.get(cb.from_user.id)
     header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path or '/'}")
-    await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
+    await edit_message(cb.message, header, _build_browser_keyboard(new_state))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_file:(\d+)$"))
@@ -452,18 +496,19 @@ async def rcl_select_file(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    mode = state.get("rcl_mode", "browse")
+    data = _state_data(state)
+    mode = data.get("rcl_mode", "browse")
     if mode not in ("copy_src", "move_src"):
         return
     idx = int(cb.data.split(":")[1])
-    items = state.get("items", [])
+    items = data.get("items", [])
     if idx < 0 or idx >= len(items):
         return
     it = items[idx]
     if it.get("type") != "file":
         return
-    remote = state.get("remote", "")
-    path = state.get("path", "")
+    remote = data.get("remote", "")
+    path = data.get("path", "")
     norm_path = (path or "").strip("/")
     prefix = f"{remote}{norm_path}/" if norm_path else remote
     src = f"{prefix}{it['name']}"
@@ -478,9 +523,10 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     state = await conversation_state.get(cb.from_user.id) or {}
-    mode = state.get("rcl_mode", "browse")
-    remote = state.get("remote", "")
-    path = state.get("path", "")
+    data = _state_data(state)
+    mode = data.get("rcl_mode", "browse")
+    remote = data.get("remote", "")
+    path = data.get("path", "")
     norm_path = (path or "").strip("/")
     current = f"{remote}{norm_path}" if norm_path else remote
 
@@ -494,13 +540,14 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
         return
 
     if mode in ("copy_dst", "move_dst"):
-        src = state.get("src")
+        src = data.get("src")
         if not src:
             await rcl_back(c, cb)
             return
         op = "copy" if mode == "copy_dst" else "move"
         await send_message(cb.message, lang.s.RCLONE_OP_IN_PROGRESS)
-        code, out, err = await _run(f'rclone {op} --config /workspace/rclone.conf "{src}" "{current}" -P')
+        cfg = _get_config_arg()
+        code, out, err = await _run(f'rclone {op} {cfg} "{src}" "{current}" -P')
         if code == 0:
             await send_message(cb.message, lang.s.RCLONE_OP_DONE)
         else:

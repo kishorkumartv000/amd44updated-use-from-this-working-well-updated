@@ -143,7 +143,7 @@ The bot includes a full Rclone integration accessible from Telegram.
 
 - In `/settings -> CORE`, set `Upload` to `RCLONE` (visible once `rclone.conf` is present)
 - When a download finishes, the bot constructs a relative path and requests a share link using:
-  - `rclone link --config ./rclone.conf "<RCLONE_DEST>/<relative_path>"`
+  - `rclone link --config <detected_config_path> "<RCLONE_DEST>/<relative_path>"` (detected_config_path = `/workspace/rclone.conf` if present, else `./rclone.conf`)
 - If `INDEX_LINK` is set, an Index URL is also produced
 - Link return options in CORE settings:
   - `False`: No links
@@ -162,6 +162,55 @@ The bot includes a full Rclone integration accessible from Telegram.
 - Copy/Move fails: Check both source and destination are accessible by your remote and you have permissions
 - Links are empty: Ensure `RCLONE_LINK_OPTIONS` in CORE settings is `RCLONE` or `Both`
 - Index link wrong: Ensure `INDEX_LINK` has no trailing `/`
+
+### Mounted remote browsing and server-side copy/move
+
+- New: In `Settings -> Rclone` you can:
+  - Browse your rclone remotes and navigate folders with paging
+  - Set the upload destination path directly from Telegram
+  - Perform cloud→cloud Copy/Move using rclone
+  - Mount and unmount remotes (container must allow FUSE)
+
+### Manual install inside a running container (for mounting)
+
+If you are testing inside a container and need to enable rclone mount manually without rebuilding:
+
+```bash
+# Install FUSE and dependencies (Debian/Ubuntu base)
+apt-get update && apt-get install -y fuse3 pkg-config libfuse3-3 ca-certificates
+
+# Allow fuse mounts inside the container (requires privileged caps at run)
+# When starting the container, add:
+#   --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined
+
+# Verify rclone exists
+rclone version
+
+# Optional: check that fuse is available
+ls -l /dev/fuse
+```
+
+Run-time flags required at container start to allow mounting:
+
+- `--cap-add SYS_ADMIN`
+- `--device /dev/fuse`
+- `--security-opt apparmor:unconfined` (or equivalent SELinux/AppArmor relaxations)
+
+Example run command:
+
+```bash
+docker run -d \
+  --env-file .env \
+  --name siesta \
+  --cap-add SYS_ADMIN \
+  --device /dev/fuse \
+  --security-opt apparmor:unconfined \
+  project-siesta
+```
+
+Notes:
+- rclone config path detection prefers `/workspace/rclone.conf`, then `./rclone.conf`, or `Config.RCLONE_CONFIG` if it points to an existing file.
+- If mounts still fail, ensure the host kernel supports FUSE and the container runtime allows it.
 
 ---
 

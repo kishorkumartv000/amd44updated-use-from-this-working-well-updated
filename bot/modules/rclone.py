@@ -52,6 +52,11 @@ def _rclone_main_buttons():
         InlineKeyboardButton(lang.s.RCLONE_COPY, callback_data="rcl_copy"),
         InlineKeyboardButton(lang.s.RCLONE_MOVE, callback_data="rcl_move"),
     ])
+    # New: Leech options
+    buttons.append([
+        InlineKeyboardButton(lang.s.RCLONE_LEECH, callback_data="rcl_leech"),
+        InlineKeyboardButton(lang.s.RCLONE_LEECH_TG, callback_data="rcl_leech_tg"),
+    ])
     # Mount controls
     buttons.append([
         InlineKeyboardButton(lang.s.RCLONE_MOUNT, callback_data="rcl_mount"),
@@ -60,15 +65,11 @@ def _rclone_main_buttons():
     # New features
     buttons.append([
         InlineKeyboardButton(lang.s.RCLONE_MYFILES, callback_data="rcl_myfiles"),
-        InlineKeyboardButton(lang.s.RCLONE_LEECH, callback_data="rcl_leech"),
-    ])
-    buttons.append([
         InlineKeyboardButton(lang.s.RCLONE_SYNC, callback_data="rcl_sync"),
-        InlineKeyboardButton(lang.s.RCLONE_MULTI, callback_data="rcl_multi"),
     ])
     buttons.append([
+        InlineKeyboardButton(lang.s.RCLONE_MULTI, callback_data="rcl_multi"),
         InlineKeyboardButton(lang.s.RCLONE_FLAGS, callback_data="rcl_flags"),
-        InlineKeyboardButton(lang.s.RCLONE_SERVE, callback_data="rcl_serve"),
     ])
     # Footer
     buttons.append([InlineKeyboardButton(lang.s.MAIN_MENU_BUTTON, callback_data="main_menu")])
@@ -388,6 +389,14 @@ async def rcl_leech(c: Client, cb: CallbackQuery):
     await _show_remote_picker(cb, mode="browse")
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^rcl_leech_tg$"))
+async def rcl_leech_tg(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    await conversation_state.start(cb.from_user.id, stage="rclone_browse", data={"rcl_mode": "leech_tg_src"})
+    await _show_remote_picker(cb, mode="browse")
+
+
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_sync$"))
 async def rcl_sync(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
@@ -701,7 +710,7 @@ async def rcl_select_file(c: Client, cb: CallbackQuery):
     state = await conversation_state.get(cb.from_user.id) or {}
     data = _state_data(state)
     mode = data.get("rcl_mode", "browse")
-    if mode not in ("copy_src", "move_src", "leech_src"):
+    if mode not in ("copy_src", "move_src", "leech_src", "leech_tg_src"):
         return
     idx = int(cb.data.split(":")[1])
     items = data.get("items", [])
@@ -717,6 +726,9 @@ async def rcl_select_file(c: Client, cb: CallbackQuery):
     src = f"{prefix}{it['name']}"
     if mode == 'leech_src':
         await _start_leech(cb, src)
+        return
+    if mode == 'leech_tg_src':
+        await _start_leech_to_telegram(cb, src)
         return
     op = "copy" if mode == "copy_src" else "move"
     # Next: pick destination
@@ -765,6 +777,10 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
         await _start_leech(cb, current)
         return
 
+    if mode == "leech_tg_src":
+        await _start_leech_to_telegram(cb, current)
+        return
+
     if mode == "sync_src":
         # Save source and pick destination
         await conversation_state.update(cb.from_user.id, rcl_mode="sync_dst", src=current)
@@ -793,6 +809,17 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
 
 
 async def _start_leech(cb: CallbackQuery, src: str):
+    cfg = _get_config_arg()
+    # Copy to local storage under leech/<user_id>
+    base_local = os.path.join(Config.LOCAL_STORAGE, str(cb.from_user.id), "leech")
+    os.makedirs(base_local, exist_ok=True)
+    cmd = f'rclone copy {cfg} "{src}" "{base_local}" -P'
+    await _run_with_progress(cb, cmd, f"Leeching to {base_local}")
+    await send_message(cb.message, lang.s.RCLONE_OP_DONE)
+    await rcl_back(aio, cb)
+
+
+async def _start_leech_to_telegram(cb: CallbackQuery, src: str):
     cfg = _get_config_arg()
     # Create unique session directory: LOCAL_STORAGE/<user_id>/leech/<session>
     base_root = os.path.join(Config.LOCAL_STORAGE, str(cb.from_user.id), "leech")
@@ -850,7 +877,7 @@ async def _start_leech(cb: CallbackQuery, src: str):
     except Exception:
         pass
 
-    await send_message(cb.message, f"✅ Leech complete. Uploaded {uploaded} file(s). Skipped {skipped}. Cleaned up local leech directory.")
+    await send_message(cb.message, f"✅ Leech to Telegram complete. Uploaded {uploaded} file(s). Skipped {skipped}. Cleaned up local leech directory.")
     await rcl_back(aio, cb)
 
 

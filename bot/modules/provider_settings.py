@@ -9,7 +9,9 @@ from ..settings import bot_set
 from ..helpers.buttons.settings import *
 from ..helpers.database.pg_impl import set_db
 
-from ..helpers.message import edit_message, check_user
+from ..helpers.message import edit_message, check_user, send_message
+from ..helpers.state import conversation_state
+from .telegram_setting import _run_wrapper_setup_flow
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^providerPanel"))
@@ -148,8 +150,29 @@ async def apple_wrapper_setup_cb(c: Client, cb: CallbackQuery):
         # Explain flow
         await edit_message(cb.message, "We'll set up the Wrapper. Please send your Apple ID username.\n\nYou can cancel anytime by sending /cancel.", InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="appleP")]]))
         # Mark state for this user
-        from ..helpers.state import conversation_state
         await conversation_state.start(cb.from_user.id, "apple_setup_username", {"chat_id": cb.message.chat.id, "msg_id": cb.message.id})
+
+
+# Redundant, dedicated text handler to ensure wrapper flow always responds
+@Client.on_message(filters.text & ~filters.command(["start", "settings", "download", "auth", "ban", "log", "cancel"]))
+async def apple_wrapper_text_inputs(c: Client, msg: Message):
+    state = await conversation_state.get(msg.from_user.id)
+    if not state:
+        return
+    stage = state.get("stage")
+    data = state.get("data", {})
+    if stage == "apple_setup_username":
+        await conversation_state.update(msg.from_user.id, stage="apple_setup_password", username=msg.text.strip())
+        await send_message(msg, "Now send your Apple ID password. You can cancel with /cancel")
+        return
+    if stage == "apple_setup_password":
+        await conversation_state.update(msg.from_user.id, stage="apple_setup_running", password=msg.text.strip())
+        await send_message(msg, "Running setup... If 2FA is required, I'll ask for it.")
+        import asyncio as _asyncio
+        _asyncio.create_task(_run_wrapper_setup_flow(c, msg))
+        return
+    # Let other modules handle other stages
+    return
 
 
 # Apple-only build: remove Qobuz/Tidal handlers

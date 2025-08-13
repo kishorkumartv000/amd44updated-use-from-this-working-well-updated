@@ -214,6 +214,10 @@ Notes:
 
 ### Additional Rclone features in this build
 
+- Both leech modes are available:
+  - 📥 Remote → Local (Leech): only downloads to local storage.
+  - 📥 Remote → Telegram (Leech): downloads to local, uploads to Telegram, then cleans local.
+
 - My Files manager
   - Open: Settings -> Rclone -> 📂 My Files
   - Pick a remote, then browse. Use Folder Options to:
@@ -229,10 +233,14 @@ Notes:
   - Open: Settings -> Rclone -> 📥 Remote → Local (Leech)
   - Pick a remote, then select a file or folder.
   - The bot first runs `rclone copy` to a unique local session directory: `${LOCAL_STORAGE}/{user_id}/leech/{session}`.
-  - After download completes, all files from that session are uploaded to Telegram (as documents) with progress.
-  - Files larger than Telegram’s ~2 GB limit are skipped with a notice.
-  - When upload finishes, the session folder is automatically cleaned up.
   - Progress and Cancel: progress appears inline; tap Cancel to stop.
+
+- Remote → Telegram (Leech)
+  - Open: Settings -> Rclone -> 📥 Remote → Telegram (Leech)
+  - Pick a remote, then select a file or folder.
+  - The bot runs `rclone copy` to `${LOCAL_STORAGE}/{user_id}/leech/{session}` and then uploads those files to Telegram as documents with progress.
+  - Files larger than Telegram’s ~2 GB limit are skipped with a notice.
+  - After upload completes, the session directory is automatically cleaned up.
 
 - Sync (source → destination identical)
   - Open: Settings -> Rclone -> 🔁 Sync (Dangerous)

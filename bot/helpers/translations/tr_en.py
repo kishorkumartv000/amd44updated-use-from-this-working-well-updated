@@ -70,7 +70,47 @@ class EN(object):
     RCLONE_CONF_DELETED = '🗑️ rclone.conf deleted.'
     RCLONE_CONF_DELETE_FAILED = 'Failed to delete rclone.conf'
 
-    
+    # New rclone features
+    RCLONE_MYFILES = '📂 My Files'
+    RCLONE_LEECH = '📥 Remote → Local (Leech)'
+    RCLONE_SYNC = '🔁 Sync (Dangerous)'
+    RCLONE_SERVE = '🌐 Serve (Optional)'
+    RCLONE_MULTI = '📡 Multi-remote Mirror'
+    RCLONE_FLAGS = '⚙️ Advanced Flags'
+    RCLONE_CONFIRM = 'Are you sure?'
+    RCLONE_YES = '✅ Yes'
+    RCLONE_NO = '✖️ No'
+    RCLONE_CANCEL = '✖️ Cancel'
+    RCLONE_FOLDER_OPTIONS = '⚙️ Folder Options'
+    RCLONE_SEARCH = '🔍 Search'
+    RCLONE_SIZE = '📏 Size'
+    RCLONE_ABOUT = 'ℹ️ Remote Usage'
+    RCLONE_MKDIR = '📁 Make Folder'
+    RCLONE_RENAME = '↪️ Rename Item'
+    RCLONE_RMDIRS = '🗑️ Delete Empty Dirs'
+    RCLONE_DEDUPE = '🧹 Dedupe (Drive)'
+    RCLONE_ENTER_QUERY = 'Send search text:'
+    RCLONE_ENTER_PORT = 'Send a TCP port to serve on (e.g., 8080):'
+    RCLONE_ENTER_DIRNAME = 'Send new folder name:'
+    RCLONE_ENTER_RENAME = 'Send "old|new" to rename item in current folder:'
+    RCLONE_FLAGS_PANEL = '<b>Advanced Rclone Flags</b>\nServer-side: {}\nCopy: {}\nUpload: {}\nDownload: {}'
+    RCLONE_TOGGLE_SERVE = 'Serve Feature: {}'
+    RCLONE_TOGGLE_SERVER_SIDE = 'Server-side across configs: {}'
+    RCLONE_SET_COPY_FLAGS = 'Set Copy Flags'
+    RCLONE_SET_UPLOAD_FLAGS = 'Set Upload Flags'
+    RCLONE_SET_DOWNLOAD_FLAGS = 'Set Download Flags'
+    RCLONE_CLEAR_COPY_FLAGS = 'Clear Copy Flags'
+    RCLONE_CLEAR_UPLOAD_FLAGS = 'Clear Upload Flags'
+    RCLONE_CLEAR_DOWNLOAD_FLAGS = 'Clear Download Flags'
+    RCLONE_SEND_FLAGS_TEXT = 'Send flags text (comma-separated, e.g. "--fast-list,--no-modtime"): '
+    RCLONE_SERVE_HTTP = 'Start HTTP'
+    RCLONE_SERVE_WEBDAV = 'Start WebDAV'
+    RCLONE_SERVE_STOP = 'Stop Serve'
+    RCLONE_SERVE_STARTED = '✅ Serving {} at http://<host>:{}'
+    RCLONE_SERVE_STOPPED = '✅ Serve stopped'
+    RCLONE_SYNC_WARN = '<b>Warning:</b> Sync makes destination identical to source (may delete files). Proceed?'
+
+
 
     TELEGRAM_PANEL = """
 <b>Telegram Settings</b>

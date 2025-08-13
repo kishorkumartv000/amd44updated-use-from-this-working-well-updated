@@ -78,6 +78,13 @@ class BotSettings:
         video_doc, _ = set_db.get_variable('VIDEO_AS_DOCUMENT')
         self.video_as_document = bool(video_doc) if isinstance(video_doc, bool) else (str(video_doc).lower() == 'true')
 
+        # Advanced rclone settings
+        self.rclone_serve_enabled = _to_bool(__getvalue__('RCLONE_SERVE_ENABLED'))
+        self.rclone_server_side = _to_bool(__getvalue__('RCLONE_SERVER_SIDE'))
+        self.rclone_copy_flags = __getvalue__('RCLONE_COPY_FLAGS') or ''
+        self.rclone_upload_flags = __getvalue__('RCLONE_UPLOAD_FLAGS') or ''
+        self.rclone_download_flags = __getvalue__('RCLONE_DOWNLOAD_FLAGS') or ''
+
         self.clients = []
         self.download_history = download_history
 

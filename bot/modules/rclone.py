@@ -60,13 +60,22 @@ async def _list_remotes() -> List[str]:
     if code != 0:
         LOGGER.error(f"rclone listremotes failed: {err}")
         return []
-    # Output ends with ':' per remote
-    remotes = [r.strip() for r in out.splitlines() if r.strip()]
+    # Ensure trailing ':' per remote
+    remotes = []
+    for r in out.splitlines():
+        r = r.strip()
+        if not r:
+            continue
+        if not r.endswith(":"):
+            r = r + ":"
+        remotes.append(r)
     return remotes
 
 
 async def _list_items(remote: str, path: str) -> List[Dict[str, str]]:
-    base = f"{remote}{path}" if path else remote
+    # Normalize base: for root, use just remote (no '/'), otherwise strip leading '/'
+    norm_path = (path or "").strip("/")
+    base = remote if norm_path == "" else f"{remote}{norm_path}/"
     # Directories
     code_d, out_d, err_d = await _run(f'rclone lsf --dirs-only --config /workspace/rclone.conf "{base}"')
     # Files
@@ -189,10 +198,11 @@ async def _unmount_path(path: str) -> (bool, str):
 async def _enter_browser(c: Client, cb: CallbackQuery, remote: str):
     state = await conversation_state.get(cb.from_user.id) or {}
     mode = state.get("rcl_mode", "browse")
+    # Start at root (empty path)
     path = ""
     items = await _list_items(remote, path)
     await conversation_state.update(cb.from_user.id, rcl_mode=mode, remote=remote, path=path, items=items, page=0)
-    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{path}")
+    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{path or '/'}")
     await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
 
 
@@ -351,6 +361,9 @@ async def rcl_pick_remote(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     remote = cb.data.split(":", 1)[1]
+    # Ensure trailing colon for robustness
+    if not remote.endswith(":"):
+        remote = remote + ":"
     state = await conversation_state.get(cb.from_user.id) or {}
     mode = state.get("rcl_mode", "browse")
     if mode == 'mount':
@@ -386,7 +399,7 @@ async def rcl_up(c: Client, cb: CallbackQuery):
         new_path = "/" + new_path + "/"
     items = await _list_items(remote, new_path)
     await conversation_state.update(cb.from_user.id, path=new_path, items=items, page=0)
-    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path}")
+    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path or '/'}")
     await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
 
 
@@ -425,11 +438,12 @@ async def rcl_open_dir(c: Client, cb: CallbackQuery):
     if it.get("type") != "dir":
         return
     remote = state.get("remote", "")
-    path = state.get("path", "") or "/"
-    new_path = f"{path}{it['name']}/" if path else f"/{it['name']}/"
+    path = state.get("path", "")
+    base_path = path or "/"
+    new_path = f"{base_path}{it['name']}/" if base_path else f"/{it['name']}/"
     new_items = await _list_items(remote, new_path)
     await conversation_state.update(cb.from_user.id, path=new_path, items=new_items, page=0)
-    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path}")
+    header = lang.s.RCLONE_BROWSE_HEADER.format(f"{remote}{new_path or '/'}")
     await edit_message(cb.message, header, _build_browser_keyboard(await conversation_state.get(cb.from_user.id)))
 
 
@@ -449,8 +463,10 @@ async def rcl_select_file(c: Client, cb: CallbackQuery):
     if it.get("type") != "file":
         return
     remote = state.get("remote", "")
-    path = state.get("path", "") or "/"
-    src = f"{remote}{path}{it['name']}"
+    path = state.get("path", "")
+    norm_path = (path or "").strip("/")
+    prefix = f"{remote}{norm_path}/" if norm_path else remote
+    src = f"{prefix}{it['name']}"
     op = "copy" if mode == "copy_src" else "move"
     # Next: pick destination
     await conversation_state.update(cb.from_user.id, rcl_mode=f"{op}_dst", src=src)
@@ -465,7 +481,8 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
     mode = state.get("rcl_mode", "browse")
     remote = state.get("remote", "")
     path = state.get("path", "")
-    current = f"{remote}{path}" if path else remote
+    norm_path = (path or "").strip("/")
+    current = f"{remote}{norm_path}" if norm_path else remote
 
     if mode == "set_path":
         # Persist upload path

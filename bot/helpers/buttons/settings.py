@@ -25,6 +25,12 @@ def main_menu():
                 text=lang.s.PROVIDERS,
                 callback_data='providerPanel'
             )
+        ],
+        [
+            InlineKeyboardButton(
+                text=lang.s.RCLONE,
+                callback_data='rclonePanel'
+            )
         ]
     ]
     inline_keyboard += close_button
@@ -76,7 +82,7 @@ def core_buttons():
             [
                 InlineKeyboardButton(
                     text=f"Return Link : {bot_set.link_options}",
-                    callback_data='linkOptions'
+                    callback_data='linkOption'
                 )
             ]
         )

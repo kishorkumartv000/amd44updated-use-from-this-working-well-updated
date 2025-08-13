@@ -83,7 +83,8 @@ class BotSettings:
 
     def check_upload_mode(self):
         """Determine upload mode based on configuration"""
-        if os.path.exists('rclone.conf'):
+        # Check rclone.conf presence in common locations or via config
+        if os.path.exists('rclone.conf') or os.path.exists('/workspace/rclone.conf'):
             self.rclone = True
         elif Config.RCLONE_CONFIG:
             if Config.RCLONE_CONFIG.startswith('http'):
@@ -100,6 +101,11 @@ class BotSettings:
             else:
                 if os.path.exists(Config.RCLONE_CONFIG):
                     self.rclone = True
+        
+        # Load RCLONE_DEST from DB if present
+        db_rclone_dest, _ = set_db.get_variable('RCLONE_DEST')
+        if db_rclone_dest:
+            Config.RCLONE_DEST = db_rclone_dest
         
         db_upload, _ = set_db.get_variable('UPLOAD_MODE')
         if self.rclone and db_upload == 'RCLONE':

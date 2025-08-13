@@ -73,6 +73,7 @@ class EN(object):
     # New rclone features
     RCLONE_MYFILES = '📂 My Files'
     RCLONE_LEECH = '📥 Remote → Local (Leech)'
+    RCLONE_LEECH_TG = '📥 Remote → Telegram (Leech)'
     RCLONE_SYNC = '🔁 Sync (Dangerous)'
     RCLONE_SERVE = '🌐 Serve (Optional)'
     RCLONE_MULTI = '📡 Multi-remote Mirror'

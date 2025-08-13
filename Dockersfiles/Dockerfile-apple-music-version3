@@ -130,9 +130,10 @@ RUN ARCH=$(uname -m) && \
 # Set full permissions on working directory
 RUN chmod 777 /usr/src/app
 
-# Install Python dependencies
+# Install Python dependencies + gamdl
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gamdl
 
 # Copy application code
 COPY . .

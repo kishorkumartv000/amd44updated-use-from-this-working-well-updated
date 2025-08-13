@@ -30,10 +30,12 @@ async def track_upload(metadata, user, index: int = None, total: int = None):
         reporter = user.get('progress')
         if reporter:
             await reporter.set_stage("Uploading")
+        # Decide media type based on setting (audio can be sent as document to avoid extra processing)
+        send_type = 'doc' if getattr(bot_set, 'audio_as_document', False) else 'audio'
         await send_message(
             user,
             metadata['filepath'],
-            'audio',
+            send_type,
             caption=await format_string(
                 "🎵 **{title}**\n👤 {artist}\n🎧 {provider}",
                 {
@@ -47,7 +49,7 @@ async def track_upload(metadata, user, index: int = None, total: int = None):
                 'artist': metadata['artist'],
                 'title': metadata['title'],
                 'thumbnail': metadata['thumbnail']
-            },
+            } if send_type == 'audio' else None,
             progress_reporter=reporter,
             progress_label="Uploading",
             file_index=index,
@@ -72,7 +74,10 @@ async def track_upload(metadata, user, index: int = None, total: int = None):
     # Cleanup
     os.remove(metadata['filepath'])
     if metadata.get('thumbnail'):
-        os.remove(metadata['thumbnail'])
+        try:
+            os.remove(metadata['thumbnail'])
+        except Exception:
+            pass
 
 async def music_video_upload(metadata, user):
     """

@@ -138,6 +138,10 @@ def core_buttons():
             InlineKeyboardButton(
                 text=f"Video Upload: {'Document' if bot_set.video_as_document else 'Media'}",
                 callback_data='vidUploadType'
+            ),
+            InlineKeyboardButton(
+                text=f"Audio Upload: {'Document' if bot_set.audio_as_document else 'Audio'}",
+                callback_data='audUploadType'
             )
         ]
     ]

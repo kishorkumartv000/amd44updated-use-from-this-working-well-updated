@@ -77,6 +77,9 @@ class BotSettings:
         # New: telegram video upload type
         video_doc, _ = set_db.get_variable('VIDEO_AS_DOCUMENT')
         self.video_as_document = bool(video_doc) if isinstance(video_doc, bool) else (str(video_doc).lower() == 'true')
+        # New: telegram audio upload type
+        audio_doc, _ = set_db.get_variable('AUDIO_AS_DOCUMENT')
+        self.audio_as_document = bool(audio_doc) if isinstance(audio_doc, bool) else (str(audio_doc).lower() == 'true')
 
         # Advanced rclone settings
         self.rclone_serve_enabled = _to_bool(__getvalue__('RCLONE_SERVE_ENABLED'))

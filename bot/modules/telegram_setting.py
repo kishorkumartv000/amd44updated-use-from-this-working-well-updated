@@ -56,6 +56,23 @@ async def anti_spam_cb(client, cb:CallbackQuery):
             pass
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^vidUploadType$"))
+async def video_upload_type_cb(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    bot_set.video_as_document = not bot_set.video_as_document
+    set_db.set_variable('VIDEO_AS_DOCUMENT', bot_set.video_as_document)
+    await tg_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^audUploadType$"))
+async def audio_upload_type_cb(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    bot_set.audio_as_document = not bot_set.audio_as_document
+    set_db.set_variable('AUDIO_AS_DOCUMENT', bot_set.audio_as_document)
+    await tg_cb(c, cb)
+
 
 @Client.on_callback_query(filters.regex(pattern=r"^langPanel"))
 async def language_panel_cb(client, cb:CallbackQuery):
@@ -66,7 +83,6 @@ async def language_panel_cb(client, cb:CallbackQuery):
             lang.s.LANGUAGE_PANEL,
             language_buttons(lang_available, current)
         )
-
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^langSet"))

@@ -57,6 +57,18 @@ class EN(object):
     RCLONE_OP_IN_PROGRESS = 'Operation running...'
     RCLONE_OP_DONE = '✅ Operation completed.'
     RCLONE_OP_FAILED = '❌ Operation failed: {}'
+    RCLONE_MOUNT = '🔗 Mount Remote'
+    RCLONE_UNMOUNT = '❌ Unmount Remote'
+    RCLONE_PICK_MOUNT = 'Pick remote to mount'
+    RCLONE_MOUNT_DONE = '✅ Mounted at {}'
+    RCLONE_MOUNT_FAIL = '❌ Mount failed: {}'
+    RCLONE_UNMOUNT_PICK = 'Pick a mount to unmount'
+    RCLONE_UNMOUNT_DONE = '✅ Unmounted {}'
+    RCLONE_UNMOUNT_FAIL = '❌ Unmount failed: {}'
+    RCLONE_NO_MOUNTS = 'No mounts found.'
+    RCLONE_DELETE_CONF = '🗑️ Delete rclone.conf'
+    RCLONE_CONF_DELETED = '🗑️ rclone.conf deleted.'
+    RCLONE_CONF_DELETE_FAILED = 'Failed to delete rclone.conf'
 
     
 

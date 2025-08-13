@@ -21,15 +21,26 @@ def _rclone_main_buttons():
     status = "ON" if bot_set.rclone else "OFF"
     buttons = [
         [InlineKeyboardButton(lang.s.RCLONE_IMPORT_CONF, callback_data="rcl_import")],
-        [InlineKeyboardButton(lang.s.RCLONE_SET_UPLOAD_PATH, callback_data="rcl_set_path")],
-        [InlineKeyboardButton(lang.s.RCLONE_REMOTE_BROWSE, callback_data="rcl_browse")],
-        [
-            InlineKeyboardButton(lang.s.RCLONE_COPY, callback_data="rcl_copy"),
-            InlineKeyboardButton(lang.s.RCLONE_MOVE, callback_data="rcl_move"),
-        ],
-        [InlineKeyboardButton(lang.s.MAIN_MENU_BUTTON, callback_data="main_menu")],
-        [InlineKeyboardButton(lang.s.CLOSE_BUTTON, callback_data="close")],
     ]
+    # Show delete conf button if a config exists
+    if os.path.exists("/workspace/rclone.conf") or os.path.exists("rclone.conf"):
+        buttons.append([InlineKeyboardButton(lang.s.RCLONE_DELETE_CONF, callback_data="rcl_del_conf")])
+    # Core actions
+    buttons.append([InlineKeyboardButton(lang.s.RCLONE_SET_UPLOAD_PATH, callback_data="rcl_set_path")])
+    buttons.append([InlineKeyboardButton(lang.s.RCLONE_REMOTE_BROWSE, callback_data="rcl_browse")])
+    buttons.append([
+        InlineKeyboardButton(lang.s.RCLONE_COPY, callback_data="rcl_copy"),
+        InlineKeyboardButton(lang.s.RCLONE_MOVE, callback_data="rcl_move"),
+    ])
+    # Mount controls
+    buttons.append([
+        InlineKeyboardButton(lang.s.RCLONE_MOUNT, callback_data="rcl_mount"),
+        InlineKeyboardButton(lang.s.RCLONE_UNMOUNT, callback_data="rcl_unmount"),
+    ])
+    # Footer
+    buttons.append([InlineKeyboardButton(lang.s.MAIN_MENU_BUTTON, callback_data="main_menu")])
+    buttons.append([InlineKeyboardButton(lang.s.CLOSE_BUTTON, callback_data="close")])
+
     header = f"{lang.s.RCLONE_PANEL}\n{lang.s.RCLONE_STATUS.format(status)}\n{lang.s.RCLONE_UPLOAD_PATH.format(dest)}"
     return header, InlineKeyboardMarkup(buttons)
 
@@ -45,7 +56,7 @@ async def _run(cmd: str) -> (int, str, str):
 
 
 async def _list_remotes() -> List[str]:
-    code, out, err = await _run("rclone listremotes --config ./rclone.conf")
+    code, out, err = await _run("rclone listremotes --config /workspace/rclone.conf")
     if code != 0:
         LOGGER.error(f"rclone listremotes failed: {err}")
         return []
@@ -57,9 +68,9 @@ async def _list_remotes() -> List[str]:
 async def _list_items(remote: str, path: str) -> List[Dict[str, str]]:
     base = f"{remote}{path}" if path else remote
     # Directories
-    code_d, out_d, err_d = await _run(f'rclone lsf --dirs-only --config ./rclone.conf "{base}"')
+    code_d, out_d, err_d = await _run(f'rclone lsf --dirs-only --config /workspace/rclone.conf "{base}"')
     # Files
-    code_f, out_f, err_f = await _run(f'rclone lsf --files-only --config ./rclone.conf "{base}"')
+    code_f, out_f, err_f = await _run(f'rclone lsf --files-only --config /workspace/rclone.conf "{base}"')
     items: List[Dict[str, str]] = []
     if code_d == 0 and out_d:
         for line in out_d.splitlines():
@@ -122,11 +133,57 @@ async def _show_remote_picker(cb_or_msg, mode: str):
     rows.append([InlineKeyboardButton(lang.s.RCLONE_BACK, callback_data="rcl_back")])
     rows.append([InlineKeyboardButton(lang.s.CLOSE_BUTTON, callback_data="close")])
     markup = InlineKeyboardMarkup(rows)
-    text = f"{lang.s.RCLONE_PANEL}\n{lang.s.RCLONE_PICK_SOURCE if mode in ('copy_src','move_src') else (lang.s.RCLONE_PICK_DEST if mode in ('copy_dst','move_dst') else lang.s.RCLONE_SET_UPLOAD_PATH)}"
+    text = f"{lang.s.RCLONE_PANEL}\n" + (
+        lang.s.RCLONE_PICK_SOURCE if mode in ('copy_src','move_src') else (
+            lang.s.RCLONE_PICK_DEST if mode in ('copy_dst','move_dst') else (
+                lang.s.RCLONE_PICK_MOUNT if mode == 'mount' else lang.s.RCLONE_SET_UPLOAD_PATH
+            )
+        )
+    )
     if isinstance(cb_or_msg, CallbackQuery):
         await edit_message(cb_or_msg.message, text, markup)
     else:
         await send_message(cb_or_msg, text, markup=markup)
+
+
+def _get_mount_dir(remote: str) -> str:
+    remote_name = remote.rstrip(':').replace('/', '_')
+    return f"/workspace/mnt/{remote_name}"
+
+
+async def _list_active_mounts() -> List[str]:
+    mounts: List[str] = []
+    try:
+        if os.path.exists('/proc/mounts'):
+            with open('/proc/mounts', 'r') as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mount_point = parts[1]
+                        fs_type = parts[2]
+                        if mount_point.startswith('/workspace/mnt/') and 'fuse' in fs_type:
+                            mounts.append(mount_point)
+    except Exception as e:
+        LOGGER.debug(f"Failed to parse mounts: {e}")
+    # Fallback: include existing dirs
+    try:
+        if os.path.isdir('/workspace/mnt'):
+            for name in os.listdir('/workspace/mnt'):
+                path = os.path.join('/workspace/mnt', name)
+                if os.path.isdir(path) and path not in mounts:
+                    mounts.append(path)
+    except Exception:
+        pass
+    return mounts
+
+
+async def _unmount_path(path: str) -> (bool, str):
+    for cmd in [f'fusermount -u "{path}"', f'fusermount3 -u "{path}"', f'umount -l "{path}"']:
+        code, out, err = await _run(cmd)
+        if code == 0:
+            return True, ''
+        last_err = err or out
+    return False, last_err
 
 
 async def _enter_browser(c: Client, cb: CallbackQuery, remote: str):
@@ -183,6 +240,37 @@ async def rclone_handle_conf(c: Client, msg: Message):
         await send_message(msg, f"Failed to save rclone.conf: {e}")
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^rcl_del_conf$"))
+async def rcl_del_conf(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    removed_any = False
+    for path in ["/workspace/rclone.conf", "rclone.conf"]:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                removed_any = True
+        except Exception as e:
+            LOGGER.error(f"Failed to delete {path}: {e}")
+    # Reset state
+    bot_set.rclone = False
+    if Config.RCLONE_DEST:
+        Config.RCLONE_DEST = None
+        try:
+            set_db.set_variable('RCLONE_DEST', '')
+        except Exception:
+            pass
+    # If upload mode was RCLONE, fallback to Local
+    try:
+        if getattr(bot_set, 'upload_mode', 'Local') == 'RCLONE':
+            bot_set.upload_mode = 'Local'
+            set_db.set_variable('UPLOAD_MODE', 'Local')
+    except Exception:
+        pass
+    await send_message(cb.message, lang.s.RCLONE_CONF_DELETED if removed_any else lang.s.RCLONE_CONF_DELETE_FAILED)
+    await rcl_back(c, cb)
+
+
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_set_path$"))
 async def rcl_set_path(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
@@ -215,11 +303,70 @@ async def rcl_move(c: Client, cb: CallbackQuery):
     await _show_remote_picker(cb, mode="move_src")
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^rcl_mount$"))
+async def rcl_mount(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    await conversation_state.start(cb.from_user.id, stage="rclone_browse", data={"rcl_mode": "mount"})
+    await _show_remote_picker(cb, mode="mount")
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^rcl_unmount$"))
+async def rcl_unmount(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    mounts = await _list_active_mounts()
+    if not mounts:
+        await send_message(cb.message, lang.s.RCLONE_NO_MOUNTS)
+        return
+    # Save to state and show picker
+    await conversation_state.start(cb.from_user.id, stage="rclone_unmount", data={"mounts": mounts})
+    rows = [[InlineKeyboardButton(m, callback_data=f"rcl_unmount_pick:{idx}")] for idx, m in enumerate(mounts)]
+    rows.append([InlineKeyboardButton(lang.s.RCLONE_BACK, callback_data="rcl_back")])
+    rows.append([InlineKeyboardButton(lang.s.CLOSE_BUTTON, callback_data="close")])
+    await edit_message(cb.message, lang.s.RCLONE_UNMOUNT_PICK, InlineKeyboardMarkup(rows))
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^rcl_unmount_pick:(\d+)$"))
+async def rcl_unmount_pick(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    state = await conversation_state.get(cb.from_user.id) or {}
+    mounts: List[str] = state.get('mounts', [])
+    idx = int(cb.data.split(":")[1])
+    if idx < 0 or idx >= len(mounts):
+        await rcl_back(c, cb)
+        return
+    target = mounts[idx]
+    ok, err = await _unmount_path(target)
+    if ok:
+        await send_message(cb.message, lang.s.RCLONE_UNMOUNT_DONE.format(target))
+    else:
+        await send_message(cb.message, lang.s.RCLONE_UNMOUNT_FAIL.format(err))
+    await rcl_back(c, cb)
+
+
 @Client.on_callback_query(filters.regex(pattern=r"^rcl_pick_remote:(.+)$"))
 async def rcl_pick_remote(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
         return
     remote = cb.data.split(":", 1)[1]
+    state = await conversation_state.get(cb.from_user.id) or {}
+    mode = state.get("rcl_mode", "browse")
+    if mode == 'mount':
+        mount_dir = _get_mount_dir(remote)
+        try:
+            os.makedirs(mount_dir, exist_ok=True)
+        except Exception:
+            pass
+        cmd = f'rclone mount --config /workspace/rclone.conf "{remote}" "{mount_dir}" --daemon --vfs-cache-mode writes'
+        code, out, err = await _run(cmd)
+        if code == 0:
+            await send_message(cb.message, lang.s.RCLONE_MOUNT_DONE.format(mount_dir))
+        else:
+            await send_message(cb.message, lang.s.RCLONE_MOUNT_FAIL.format(err or out))
+        await rcl_back(c, cb)
+        return
     await _enter_browser(c, cb, remote)
 
 
@@ -336,7 +483,7 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
             return
         op = "copy" if mode == "copy_dst" else "move"
         await send_message(cb.message, lang.s.RCLONE_OP_IN_PROGRESS)
-        code, out, err = await _run(f'rclone {op} --config ./rclone.conf "{src}" "{current}" -P')
+        code, out, err = await _run(f'rclone {op} --config /workspace/rclone.conf "{src}" "{current}" -P')
         if code == 0:
             await send_message(cb.message, lang.s.RCLONE_OP_DONE)
         else:

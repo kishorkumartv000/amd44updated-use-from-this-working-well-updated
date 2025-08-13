@@ -54,6 +54,18 @@ class TR(object):
     RCLONE_OP_IN_PROGRESS = 'İşlem çalışıyor...'
     RCLONE_OP_DONE = '✅ İşlem tamamlandı.'
     RCLONE_OP_FAILED = '❌ İşlem başarısız: {}'
+    RCLONE_MOUNT = '🔗 Uzağı Bağla'
+    RCLONE_UNMOUNT = '❌ Ayır (Unmount)'
+    RCLONE_PICK_MOUNT = 'Bağlanacak uzak depoyu seçin'
+    RCLONE_MOUNT_DONE = '✅ Bağlandı: {}'
+    RCLONE_MOUNT_FAIL = '❌ Bağlama başarısız: {}'
+    RCLONE_UNMOUNT_PICK = 'Ayırmak için bir bağlama noktası seçin'
+    RCLONE_UNMOUNT_DONE = '✅ Ayrıldı: {}'
+    RCLONE_UNMOUNT_FAIL = '❌ Ayırma başarısız: {}'
+    RCLONE_NO_MOUNTS = 'Bağlı nokta bulunamadı.'
+    RCLONE_DELETE_CONF = '🗑️ rclone.conf Sil'
+    RCLONE_CONF_DELETED = '🗑️ rclone.conf silindi.'
+    RCLONE_CONF_DELETE_FAILED = 'rclone.conf silinemedi'
 
     
 

@@ -84,14 +84,14 @@ class BotSettings:
     def check_upload_mode(self):
         """Determine upload mode based on configuration"""
         # Check rclone.conf presence in common locations or via config
-        if os.path.exists('rclone.conf') or os.path.exists('/workspace/rclone.conf'):
+        if os.path.exists('/workspace/rclone.conf'):
             self.rclone = True
         elif Config.RCLONE_CONFIG:
             if Config.RCLONE_CONFIG.startswith('http'):
                 try:
                     rclone = requests.get(Config.RCLONE_CONFIG, allow_redirects=True)
                     if rclone.status_code == 200:
-                        with open('rclone.conf', 'wb') as f:
+                        with open('/workspace/rclone.conf', 'wb') as f:
                             f.write(rclone.content)
                         self.rclone = True
                     else:
@@ -100,6 +100,7 @@ class BotSettings:
                     LOGGER.error(f"Rclone config download error: {str(e)}")
             else:
                 if os.path.exists(Config.RCLONE_CONFIG):
+                    # Copy or symlink could be considered, but simply flag rclone available
                     self.rclone = True
         
         # Load RCLONE_DEST from DB if present

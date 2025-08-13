@@ -212,6 +212,63 @@ Notes:
 - rclone config path detection prefers `/workspace/rclone.conf`, then `./rclone.conf`, or `Config.RCLONE_CONFIG` if it points to an existing file.
 - If mounts still fail, ensure the host kernel supports FUSE and the container runtime allows it.
 
+### Additional Rclone features in this build
+
+- My Files manager
+  - Open: Settings -> Rclone -> 📂 My Files
+  - Pick a remote, then browse. Use Folder Options to:
+    - 🔍 Search: enter a query to find files/folders (recursive)
+    - 📏 Size: show size of current path
+    - ℹ️ Remote Usage: show remote quota/usage (rclone about)
+    - 📁 Make Folder: create a subfolder in current directory
+    - ↪️ Rename Item: send `old|new` to rename item in current directory
+    - 🗑️ Delete Empty Dirs: delete empty directories below current path
+    - 🧹 Dedupe (Drive): resolve duplicate objects on Google Drive remotes
+
+- Remote → Local (Leech)
+  - Open: Settings -> Rclone -> 📥 Remote → Local (Leech)
+  - Pick a remote, select a file or folder; the bot runs `rclone copy` to local storage under `${LOCAL_STORAGE}/{user_id}/leech`.
+  - Progress and Cancel: progress appears inline; tap Cancel to stop.
+
+- Sync (source → destination identical)
+  - Open: Settings -> Rclone -> 🔁 Sync (Dangerous)
+  - Pick source remote/folder, then pick destination remote/folder
+  - You will be asked to confirm; sync will modify destination to match source (may delete)
+  - Advanced flag “Server-side across configs” can be toggled in Advanced Flags
+  - Progress and Cancel supported
+
+- Multi-remote Mirror
+  - Open: Settings -> Rclone -> 📡 Multi-remote Mirror
+  - Select one or more destination remotes, then choose a source remote/folder
+  - The bot mirrors source to each selected destination sequentially
+
+- Serve HTTP/WebDAV (optional)
+  - Toggle availability in Advanced Flags (OFF by default)
+  - Open: Settings -> Rclone -> 🌐 Serve (Optional)
+  - Pick remote, then send a TCP port (e.g., 8080)
+  - Choose Start HTTP or Start WebDAV; the bot starts `rclone serve` with that remote
+  - Stop via “Stop Serve” button
+  - Requires container/network permissions and open ports
+
+- Advanced Rclone Flags
+  - Open: Settings -> Rclone -> ⚙️ Advanced Flags
+  - Options:
+    - Toggle “Server-side across configs”: enables `--server-side-across-configs` for sync (where supported)
+    - Set Copy Flags / Upload Flags / Download Flags: accept comma-separated flags like `--fast-list,--no-modtime`
+    - Clear each set to reset
+  - Benefits:
+    - Server-side copy/sync reduces egress and speeds up transfers within providers
+    - `--fast-list` and `--no-modtime` can improve list performance and reduce API calls
+    - Tailor behavior for provider quirks and performance
+
+- Remote Search
+  - Available within My Files -> 🔍 Search
+  - Enter a query; first 10 matches are listed. Selecting a result opens its parent directory in the browser
+
+- Progress + Cancel for long ops
+  - Copy/Move/Leech/Sync/Mirror show a live “Transferred:” line
+  - A Cancel button allows stopping the active rclone process
+
 ---
 
 ## CREDITS

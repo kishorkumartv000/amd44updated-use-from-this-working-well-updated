@@ -17,6 +17,7 @@ from ..helpers.database.pg_impl import set_db
 from ..settings import bot_set
 from config import Config
 from bot.logger import LOGGER
+from bot.tgclient import aio
 
 PAGE_SIZE = 10
 

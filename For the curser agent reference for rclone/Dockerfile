@@ -5,6 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /usr/src/app
 
+RUN chmod 777 /usr/src/app
+
+# Install essential packages
 RUN apt-get update -qq && apt-get upgrade -qq -y && \
     apt-get install -qq -y apt-utils python3 python3-venv python3-pip python3-dev ffmpeg gcc libffi-dev sudo nano vim curl python-is-python3 && \
     rm -rf /var/lib/apt/lists/*
@@ -30,7 +33,9 @@ FROM base AS final
 COPY --from=builder /usr/bin/rclone /usr/bin/rclone
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
+
+RUN pip install --no-cache-dir -r requirements.txt --break-system-packages && \
+    rm requirements.txt
 
 COPY . .
 

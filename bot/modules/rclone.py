@@ -18,6 +18,8 @@ from ..settings import bot_set
 from config import Config
 from bot.logger import LOGGER
 from bot.tgclient import aio
+from bot.helpers.progress import ProgressReporter
+from bot.helpers.utils import MAX_SIZE
 
 PAGE_SIZE = 10
 
@@ -792,13 +794,64 @@ async def rcl_select_here(c: Client, cb: CallbackQuery):
 
 async def _start_leech(cb: CallbackQuery, src: str):
     cfg = _get_config_arg()
-    # Copy to local storage under leech/<user_id>
-    base_local = os.path.join(Config.LOCAL_STORAGE, str(cb.from_user.id), "leech")
-    os.makedirs(base_local, exist_ok=True)
-    cmd = f'rclone copy {cfg} "{src}" "{base_local}" -P'
-    await _run_with_progress(cb, cmd, f"Leeching to {base_local}")
-    await send_message(cb.message, lang.s.RCLONE_OP_DONE)
-    await rcl_back(aio, cb)  # type: ignore
+    # Create unique session directory: LOCAL_STORAGE/<user_id>/leech/<session>
+    base_root = os.path.join(Config.LOCAL_STORAGE, str(cb.from_user.id), "leech")
+    session_dir = os.path.join(base_root, uuid.uuid4().hex[:8])
+    os.makedirs(session_dir, exist_ok=True)
+    cmd = f'rclone copy {cfg} "{src}" "{session_dir}" -P'
+    await _run_with_progress(cb, cmd, f"Leeching to {session_dir}")
+
+    # Collect files to upload
+    files: List[str] = []
+    for root, _, names in os.walk(session_dir):
+        for name in names:
+            files.append(os.path.join(root, name))
+
+    if not files:
+        await send_message(cb.message, "No files found to upload.")
+        await rcl_back(aio, cb)
+        return
+
+    # Progress reporter message for uploads
+    progress_msg = await send_message(cb.message, "Uploading leeched files...")
+    reporter = ProgressReporter(progress_msg, label="Leech Upload")
+
+    total_files = len(files)
+    uploaded = 0
+    skipped = 0
+
+    for idx, file_path in enumerate(files, start=1):
+        try:
+            size = os.path.getsize(file_path)
+        except Exception:
+            size = 0
+        # Skip oversized files for Telegram
+        if size and size > MAX_SIZE:
+            skipped += 1
+            await send_message(cb.message, f"Skipped (too large for Telegram): {os.path.basename(file_path)}")
+            continue
+        # Upload as document
+        await send_message(
+            cb.message,
+            file_path,
+            'doc',
+            caption=os.path.basename(file_path),
+            progress_reporter=reporter,
+            progress_label="Uploading",
+            file_index=idx,
+            total_files=total_files
+        )
+        uploaded += 1
+
+    # Cleanup session directory
+    try:
+        import shutil
+        shutil.rmtree(session_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+    await send_message(cb.message, f"✅ Leech complete. Uploaded {uploaded} file(s). Skipped {skipped}. Cleaned up local leech directory.")
+    await rcl_back(aio, cb)
 
 
 async def _start_multi_mirror(cb: CallbackQuery, src: str, targets: List[str]):

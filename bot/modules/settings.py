@@ -223,11 +223,9 @@ async def ban(client:Client, msg:Message):
                 bot_set.auth_chats.remove(id)
                 set_db.set_variable('AUTH_CHATS', str(bot_set.auth_chats))
             else: await send_message(msg, lang.s.USER_DOEST_EXIST)
-        await send_message(msg, lang.s.BAN_ID)
-        
 
 @Client.on_message(filters.command(CMD.AUTH))
-async def auth(client:Client, msg:Message):
+async def authenticate(client:Client, msg:Message):
     if await check_user(msg.from_user.id, restricted=True):
         try:
             id = int(msg.text.split(" ", maxsplit=1)[1])
@@ -237,16 +235,19 @@ async def auth(client:Client, msg:Message):
 
         user = False if str(id).startswith('-100') else True
         if user:
-            if id not in bot_set.auth_users:
+            if id in bot_set.auth_users:
+                await send_message(msg, lang.s.USER_EXIST)
+            else:
                 bot_set.auth_users.append(id)
                 set_db.set_variable('AUTH_USERS', str(bot_set.auth_users))
-            else: await send_message(msg, lang.s.USER_EXIST)
+                await send_message(msg, lang.s.AUTH_ID)
         else:
-            if id not in bot_set.auth_chats:
+            if id in bot_set.auth_chats:
+                await send_message(msg, lang.s.USER_EXIST)
+            else:
                 bot_set.auth_chats.append(id)
                 set_db.set_variable('AUTH_CHATS', str(bot_set.auth_chats))
-            else: await send_message(msg, lang.s.USER_EXIST)
-        await send_message(msg, lang.s.AUTH_ID)
+                await send_message(msg, lang.s.AUTH_ID)
 
 
 @Client.on_message(filters.command(CMD.LOG))

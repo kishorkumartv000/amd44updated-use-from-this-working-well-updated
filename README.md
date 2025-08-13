@@ -108,6 +108,63 @@ sudo docker run -d --env-file .env --name siesta project-siesta
 - `TRACK_NAME_FORMAT` - Naming format for tracks (check [metadata](https://github.com/vinayak-7-0-3/Project-Siesta/blob/2bbea8572d660a92bb182a360e91791583f4523b/bot/helpers/metadata.py#L16) section for tags supported) `(str)`
 - `PLAYLIST_NAME_FORMAT` - Similar to `TRACK_NAME_FORMAT` but for Playlists (Note: all tags might not be available) `(str)`
 
+## Rclone Features and Usage
+
+The bot includes a full Rclone integration accessible from Telegram.
+
+- Location: `Settings -> Rclone`
+- Requirements:
+  - A working `rclone.conf` with at least one remote configured
+  - rclone binary is bundled in Docker image; for local runs install rclone (`apt install rclone`)
+
+### What you can do
+
+- Import rclone.conf from Telegram
+  - Tap `📥 Import rclone.conf` and send your `rclone.conf` file to the bot
+  - The file is saved and used automatically; no restarts needed
+
+- Set upload path (destination) from Telegram
+  - Tap `📂 Set Upload Path`
+  - Pick a remote, browse to the desired folder, tap `Select this folder`
+  - Destination is saved in the database and used for future Rclone uploads
+  - You can still set `RCLONE_DEST` via env; Telegram setting overrides it at runtime
+
+- Browse Rclone remotes
+  - Tap `🗂️ Browse Remotes`
+  - Navigate folders with `⬆️ Up`, `◀️ Prev`, `Next ▶️`
+  - View both folders and files as buttons
+
+- Cloud → Cloud copy/move
+  - Tap `📄 Cloud → Cloud Copy` or `📦 Cloud → Cloud Move`
+  - Pick a source remote/file, then pick destination remote/folder
+  - The bot runs `rclone copy`/`rclone move` with progress in the background
+
+### How uploads work with Rclone
+
+- In `/settings -> CORE`, set `Upload` to `RCLONE` (visible once `rclone.conf` is present)
+- When a download finishes, the bot constructs a relative path and requests a share link using:
+  - `rclone link --config ./rclone.conf "<RCLONE_DEST>/<relative_path>"`
+- If `INDEX_LINK` is set, an Index URL is also produced
+- Link return options in CORE settings:
+  - `False`: No links
+  - `Index`: Only Index link
+  - `RCLONE`: Only Rclone link
+  - `Both`: Both links
+
+### Where files are stored
+
+- `rclone.conf` path: `./rclone.conf` (bot checks `/workspace/rclone.conf` too)
+- Destination: `RCLONE_DEST` stored in DB (overrides `.env` at runtime)
+
+### Troubleshooting
+
+- No remotes shown: Verify your `rclone.conf` contains remotes (e.g., run `rclone listremotes` locally)
+- Copy/Move fails: Check both source and destination are accessible by your remote and you have permissions
+- Links are empty: Ensure `RCLONE_LINK_OPTIONS` in CORE settings is `RCLONE` or `Both`
+- Index link wrong: Ensure `INDEX_LINK` has no trailing `/`
+
+---
+
 ## CREDITS
 - OrpheusDL - https://github.com/yarrm80s/orpheusdl
 - Streamrip - https://github.com/nathom/streamrip

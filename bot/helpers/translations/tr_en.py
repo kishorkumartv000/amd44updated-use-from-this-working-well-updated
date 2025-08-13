@@ -34,6 +34,29 @@ class EN(object):
     LANGUAGE_PANEL = 'Select bot language here'
     CORE_PANEL = 'Edit main settings here'
     PROVIDERS_PANEL = 'Configure each platform seperartelty'
+    RCLONE_PANEL = '<b>Rclone Settings</b>'
+    RCLONE_STATUS = 'Status: {}'
+    RCLONE = 'Rclone'
+    RCLONE_UPLOAD_PATH = 'Upload Path: {}'
+    RCLONE_REMOTE_BROWSE = '🗂️ Browse Remotes'
+    RCLONE_SET_UPLOAD_PATH = '📂 Set Upload Path'
+    RCLONE_IMPORT_CONF = '📥 Import rclone.conf'
+    RCLONE_COPY = '📄 Cloud → Cloud Copy'
+    RCLONE_MOVE = '📦 Cloud → Cloud Move'
+    RCLONE_BACK = '🔙 Back'
+    RCLONE_SEND_CONF = 'Please send your rclone.conf file here.'
+    RCLONE_CONF_SAVED = '✅ rclone.conf saved.'
+    RCLONE_DEST_SET = '✅ Upload path set to {}'
+    RCLONE_BROWSE_HEADER = '<b>Browsing:</b> {}'
+    RCLONE_BROWSE_NEXT = 'Next ▶️'
+    RCLONE_BROWSE_PREV = '◀️ Prev'
+    RCLONE_BROWSE_UP = '⬆️ Up'
+    RCLONE_SELECT_THIS = 'Select this folder'
+    RCLONE_PICK_SOURCE = 'Pick source'
+    RCLONE_PICK_DEST = 'Pick destination'
+    RCLONE_OP_IN_PROGRESS = 'Operation running...'
+    RCLONE_OP_DONE = '✅ Operation completed.'
+    RCLONE_OP_FAILED = '❌ Operation failed: {}'
 
     
 
@@ -133,7 +156,7 @@ Type : {1}
 Provider : {2}
 """
 
-ARTIST_TEMPLATE = """
+    ARTIST_TEMPLATE = """
 👤 <b>Artist :</b> {artist}
 💫 <b>Quality :</b> {quality}
 📡 <b>Provider :</b> {provider}

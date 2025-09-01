@@ -129,5 +129,9 @@ RUN ARCH=$(uname -m) && \
 # Set full permissions on working directory
 RUN chmod 777 /usr/src/app
 
-# Copy application code (no Python deps installed)
-COPY . .
+# Add entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

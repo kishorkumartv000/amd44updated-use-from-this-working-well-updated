@@ -1,0 +1,136 @@
+FROM python:3.12-slim AS base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Kolkata \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/usr/local/go/bin:$PATH"
+
+WORKDIR /usr/src/app
+
+# Install system dependencies and multimedia tools
+RUN apt-get update -qq && \
+    apt-get install -qq -y --no-install-recommends \
+    ffmpeg \
+    gcc \
+    libffi-dev \
+    fuse3 \
+    build-essential \
+    zlib1g-dev \
+    wget \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    unzip \
+    libxml2 \
+    libxslt1.1 \
+    curl \
+    sudo \
+    vim \
+    nano \
+    git \
+    net-tools \
+    iputils-ping \
+    tar \
+    make \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install rclone
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; \
+    elif [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
+    curl -sO https://downloads.rclone.org/v1.68.2/rclone-v1.68.2-linux-${ARCH}.zip && \
+    unzip -q rclone-v1.68.2-linux-${ARCH}.zip && \
+    install -m 755 rclone-v1.68.2-linux-${ARCH}/rclone /usr/bin/rclone && \
+    rm -rf rclone-v1.68.2-linux-${ARCH}*
+
+# Create rclone config directory and empty config file
+RUN mkdir -p /root/.config/rclone && \
+    touch /root/.config/rclone/rclone.conf
+
+# Install N_m3u8DL-RE
+RUN mkdir -p /tmp/N_m3u8DL-RE && \
+    cd /tmp/N_m3u8DL-RE && \
+    wget -q "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.3.0-beta/N_m3u8DL-RE_v0.3.0-beta_linux-x64_20241203.tar.gz" && \
+    tar -xzf N_m3u8DL-RE_v0.3.0-beta_linux-x64_20241203.tar.gz && \
+    cp N_m3u8DL-RE /usr/bin/ && \
+    chmod +x /usr/bin/N_m3u8DL-RE && \
+    rm -rf /tmp/N_m3u8DL-RE
+
+# Build GPAC (MP4Box) from source
+RUN mkdir -p /tmp/gpac && \
+    cd /tmp/gpac && \
+    git clone https://github.com/gpac/gpac.git && \
+    cd gpac && \
+    ./configure --static-bin && \
+    make -j"$(nproc)" && \
+    make install && \
+    chmod +x /usr/local/bin/MP4Box && \
+    rm -rf /tmp/gpac && \
+    MP4Box -version
+
+# Install Bento4
+RUN mkdir -p /tmp/Bento4 && \
+    cd /tmp/Bento4 && \
+    wget -q "https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-641.x86_64-unknown-linux.zip" && \
+    unzip -o -q Bento4-SDK-1-6-0-641.x86_64-unknown-linux.zip && \
+    cd Bento4-SDK-1-6-0-641.x86_64-unknown-linux && \
+    find bin/ -maxdepth 1 -type f -executable -exec cp {} /usr/local/bin \; && \
+    cp -r include /usr/local/include/Bento4 && \
+    cp -r lib /usr/local/lib/Bento4 && \
+    rm -rf /tmp/Bento4
+
+# Install Go 1.25.0
+RUN ARCH=$(uname -m) && \
+    case $ARCH in \
+        x86_64) GO_ARCH="amd64" ;; \
+        aarch64) GO_ARCH="arm64" ;; \
+        armv7l) GO_ARCH="armv6l" ;; \
+        i686) GO_ARCH="386" ;; \
+        *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac && \
+    wget -q "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" -O /tmp/go.tar.gz && \
+    tar -C /usr/local -xzf /tmp/go.tar.gz && \
+    rm /tmp/go.tar.gz
+
+# Create music output directories
+RUN mkdir -p /root/Music/Apple\ Music/alac \
+             /root/Music/Apple\ Music/atmos \
+             /root/Music/Apple\ Music/aac
+
+# Pre-clone amalac repo and build Go project
+RUN git clone https://github.com/zhaarey/apple-music-alac-atmos-downloader.git /root/amalac && \
+    cd /root/amalac && \
+    /usr/local/go/bin/go clean -modcache && \
+    /usr/local/go/bin/go get -u ./... && \
+    /usr/local/go/bin/go mod tidy
+
+# Setup wrapper binary
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        WRAPPER_URL="https://github.com/zhaarey/wrapper/releases/download/linux.V2/wrapper.x86_64.tar.gz"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        WRAPPER_URL="https://github.com/zhaarey/wrapper/releases/download/arm64/wrapper.arm64.tar.gz"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    mkdir -p /app/wrapper && \
+    cd /app/wrapper && \
+    wget -q "$WRAPPER_URL" -O wrapper.tar.gz && \
+    tar -xzf wrapper.tar.gz && \
+    rm wrapper.tar.gz && \
+    chmod +x wrapper
+
+# Set full permissions on working directory
+RUN chmod 777 /usr/src/app
+
+# Add entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

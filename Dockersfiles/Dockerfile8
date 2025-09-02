@@ -1,0 +1,18 @@
+FROM ghcr.io/kishorkumartv000/amd-aio-new-dock-for-all:base-image-but-pre-installed-all-essentials
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Kolkata \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    
+WORKDIR /usr/src/app
+
+# Set full permissions on working directory
+RUN chmod -R 777 /usr/src/app
+
+# Add entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
